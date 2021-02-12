@@ -1,0 +1,61 @@
+		ORG 0
+GLAVNI	MOV SP,#10<12			;inicijalizacija SP-a
+		MOV R0,#1<8				;pocetni blok podataka
+		MOV R1,#4<8				;odredisni blok podataka
+		LDR R2,MASKA			;stavljanje 80000000 u R2
+		
+PETLJA	LDR R3,[R0],#4			;ucitaj broj iz pocetnog bloka
+		CMP R3,R2				;provjeri je li kraj pocetnog bloka
+		BEQ KRAJ
+		CMP R3,#0				;ako je broj 0, ucitaj novi broj jer funkcija nije definiriana u 0
+		STREQ R3,[R1],#4		;ali svejedno spremi 0 na tu lokaciju jer mozda se nesto vec od prije nalazi pa da se ocisti
+		BEQ PETLJA
+		STMFD SP!,{R3}			;stavi parametar na stog
+		BL KUB
+		SUB R4,R4,#1			;operacija (x^3-1)
+		LDMFD SP!,{R3}			;skini parametar sa stoga
+		MOV R3,R3,LSL #1		;operacija (2*x)
+		STMFD SP!,{R3,R4}		;stavi parametre na stog..u R3 je nazivnik, a u R4 je brojnik
+		BL DIV
+		ADD SP,SP,#8			;skini parametre sa stoga
+		STR R5,[R1],#4			;spremanje rezultata u odredisni blok
+		B PETLJA
+		
+MASKA	DW	80000000		
+KRAJ	SWI 123456				;zaustavi proc
+
+KUB		STMFD SP!,{R0}			;sacuvaj kontekst
+		ADD R0,SP,#4
+		LDMFD R0!,{R4}			;dohvati parametar sa stoga
+		MUL R0,R4,R4
+		MUL R4,R4,R0			;rjesenje se vraca pomocu registra R4
+END_1	LDMFD SP!,{R0}			;obnovi kontekst
+		MOV PC,LR				;vrati se na mjesto nakon poziva naredbe BL KUB
+		
+DIV		STMFD SP!,{R0,R1,R2}	;sacuvaj kontekst
+		ADD R0,SP,#0C
+		LDMFD R0!,{R1,R2}		;dohvat parametara sa stoga..u R1 nazivnik, a u R2 brojnik
+		MOV R5,#0				;inicijalizacija registra R5 pomocu kojeg se vraca rezultat
+		
+P_1		CMP R1,#0				;provjera je li nazivnik poz/neg
+		BPL P_2					;ako je pozitivan,provjeri brojnik,inace promijeni nazivnik
+		
+NEG_N	RSB R1,R1,#0			;negativan nazivnik->pozitivan nazivnik
+
+P_2		CMP R2,#0				;provjeri je li brojnik poz/neg
+		BPL LOOP				;ako je pozitivan,izvrsi uzastopno oduzimanje,inace promijeni brojnik
+		
+NEG_BR	RSB R2,R2,#0			;negativan brojnik->pozitivan brojnik
+		
+LOOP	SUBS R2,R2,R1			;uzastopno oduzimanje
+		ADDPL R5,R5,#1			;ako je rezultat oduzimanja pozitivan,nadodaj 1 u registar R5
+		BPL LOOP				;ako je rezultat pozitivan i dalje izvrsavaj uzastopno oduzimanje
+		
+END_2	LDMFD SP!,{R0,R1,R2}	;obnovi kontekst
+		MOV PC,LR				;vrati se na mjesto nakon poziva naredbe BL DIV
+		
+		ORG 100
+		DW 0,3,6,0FFFFFFFF,0FFFFFFFA,80000000
+		
+		ORG 400
+		DS %D20					;osiguravanje 20 praznina...nije obavezno

@@ -1,0 +1,78 @@
+		ORG 0
+		MOV SP,#10<12					;inicijalizacija stoga
+		B GLAVNI
+	
+		ORG 18							;adresa prekidnog IRQ potprograma..moze se i vektorski rijesiti kao i kod FRISC-a,
+IRQ		STMFD SP!,{R0,R1,R2,R3,R4,R14}	;ali s obzirom da je ovo jedini prekidni program,moze biti i direktno implementiran
+		LDR R0,RTC						;bazni registar za RTC
+		LDR R1,GPIO						;bazni registar za GPIO
+		MOV R2,#0
+		STR R2,[R0,#0C]					;postavi brojilo RTC-a na 0...nije automatski kao kod FRISC-a i CT-a
+		STR R2,[R0,#8]					;dojavi prihvat prekida..standardno posluzivanje vanjske jedinice
+		
+		MOV R2,#0D						;ocisti interni registar LCD-a
+		BL LCDWR
+		
+		MOV R3,#3						;inicijaliziraj R3 na 3 jer su potrebna 3 znaka
+LOOP_1	MOV R2,#3E						;postavi znak > 3 puta..">>>"
+		BL LCDWR
+		SUBS R3,R3,#1
+		BNE LOOP_1
+		
+DOHVAT	MOV R3,#4<8						;inicijaliziraj bazni registar za dohvat slova
+		LDR R4,INDEKS					;dohvati indeks u registar R4 u kojemu se prati polozaj u nizu
+		LDRB R2,[R3,R4]					;dohvati slovo u registar R2..glavni registar za slova
+		CMP R2,#0						;provjeri je li null,tj. je li kraj niza
+		
+NULL	STREQ R2,INDEKS					;u slucaju da je kraj niza,reinicijaliziraj labelu INDEKS na 0
+		MOVEQ R4,R2						;postavi 0 u registar R4 kako bi se krenulo od pocetka niza		
+		LDREQB R2,[R3]					;te loadaj znakove ispocetka u registar R2
+		
+		BL LCDWR						;postavi znak u LCD-ov interni registar
+		
+		ADD R4,R4,#1					;povecaj indeks
+		STR R4,INDEKS
+		
+		MOV R3,#3						;inicijaliziraj R3 na 3 jer su potrebna 3 znaka
+LOOP_2	MOV R2,#3C						;postavi znak < 3 puta.."<<<"
+		BL LCDWR
+		SUBS R3,R3,#1
+		BNE LOOP_2
+		
+		MOV R2,#0A						;posalji LF(Line Feed) na LCD kako bi mogao prikazati trenutni znak u internom regu
+		BL LCDWR
+		
+IZLAZ	LDMFD SP!,{R0,R1,R2,R3,R4,R14}	;obnovi kontekst
+		SUBS PC,LR,#4					;izadi iz IRQ prekidnog potprograma
+
+RTC		DW 0FFFFFE00
+GPIO	DW 0FFFFFF00
+INDEKS 	DW 0
+
+GLAVNI	LDR R0,RTC						;bazni registar za RTC
+		MOV R1,#1<8						;inicijaliziraj konstantu usporedbe u registar R1 za RTC
+		STR R1,[R0,#4]					;postavi konstantu usporedbe u registar usporedbe RCT-a
+		MOV R1,#1
+		STR R1,[R0,#10]					;dozvoli postavljanje prekida RTC-a
+		MRS R1,CPSR						;dozvoljavanje procesoru da postavlja IRQ prekide tako da se pomocu naredbe
+		BIC R1,R1,#80					;Bit Clear postavi 7.bit u 0				
+		MSR CPSR_c,R1
+		
+PETLJA	B PETLJA
+
+LCDWR	STMFD SP!,{R2}
+
+		AND R2,R2,#7F					;ocisti 7.bit podatka koji salje LCD za svaki slucaj
+		STR R2,[R1,#4];					;u R1 se nalazi vec adresa GPIO-a,sprei na B vrata GPIO-a
+		
+		ORR R2,R2,#80					;postavi 7.bit(podigni impuls)
+		STR R2,[R1,#4]					
+		
+		AND R2,R2,#7F					;ocisti 7.bit(spusti impuls)
+		STR R2,[R1,#4]
+		
+		LDMFD SP!,{R2}					;ocisti kontekst
+		MOV PC,LR						;povratak iz potprograma
+		
+		ORG 400
+		DB	49,6E,74,65,72,6E,61,74,69,6F,6E,61,6C,69,73,61,74,69,6F,6E,0

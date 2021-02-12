@@ -1,0 +1,36 @@
+			ORG 0  
+			LOAD R0, (500) 
+			MOVE 504, R1 
+			MOVE 1000, R2 
+
+PETLJA		SUB R0, 1, R0 
+			JR_M KRAJ 
+			LOADH R3, (R1) 
+			AND R3, 7F00, R4  
+			JR_NZ PROMIJENI 
+			AND R3, 8000, R5 
+			JR_Z POZ 
+			XOR R3, 0FF, R3 
+			ADD R3, 1, R3 
+			STOREB R3, (R2)  
+			JR POVECAJ  
+
+PROMIJENI	MOVE 80, R3 
+			STOREB R3, (R2) 
+			JR POVECAJ  
+
+POZ			STOREB R3, (R2) 
+			JR POVECAJ
+
+POVECAJ 	ADD R1, 2, R1 
+			ADD R2, 1, R2 
+			JR PETLJA 
+
+KRAJ		HALT 
+
+			ORG 500 
+			DW 6 
+			DH 8001, 0002, 0123, 0025, 82BC, 8021 
+
+			ORG 1000 
+			DS  6 

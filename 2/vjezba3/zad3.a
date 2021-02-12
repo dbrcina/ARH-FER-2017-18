@@ -1,0 +1,76 @@
+VJ1		 EQU 0FFFF1000
+
+VJ2_D	 EQU 0FFFF2000
+VJ2_S	 EQU 0FFFF2004
+
+VJ3_D	 EQU 0FFFF3000
+VJ3_ACK	 EQU 0FFFF3004
+VJ3_END	 EQU 0FFFF3008
+VJ3_STOP EQU 0FFFF300C
+
+	ORG 0
+	MOVE 10000,SP
+	JR GLAVNI
+	
+	ORG 8					;adresa prekidnog INT potprograma
+	DW 100
+	
+GLAVNI	MOVE %B 10000,SR
+		MOVE 1,R0
+		STORE R0,(VJ3_STOP) ;dozvoli da prekidna vj javlja prekid
+		
+PETLJA	LOAD R0,(GOTOVO)	;provjeri treba li zaustaviti proc
+		CMP R0,0			
+		JR_EQ FINISH
+		LOAD R0,(VJ2_S)		;provjeri spremnost vj2
+		CMP R0,0 			
+		JR_EQ PETLJA
+		
+P_VJ2	LOAD R0,(BROJ)
+		STORE R0,(VJ2_D)
+		STORE R0,(VJ2_S)
+		LOAD R0,(BROJAC)
+		ADD R0,1,R0
+		STORE R0,(BROJAC)
+		JR PETLJA
+
+FINISH	HALT
+		
+BROJ	DW 0
+BROJAC	DW 0
+
+		ORG 100				;prekidni potprogram za INT
+PR_INT	PUSH R0
+		MOVE SR,R0
+		PUSH R0
+		STORE R0,(VJ3_ACK)
+		LOAD R0,(VJ1)
+		CMP R0,0			;provjeri je li broj pozitivan/negativan
+		JR_P DALJE
+		
+KRAJ	MOVE 0,R0
+		STORE R0,(VJ3_STOP)
+		STORE R0,(GOTOVO)
+		JR IZADI
+
+DALJE	PUSH R0
+		CALL OBRADI
+		ADD SP,4,SP
+		STORE R0,(BROJ)
+		LOAD R0,(BROJAC)
+		STORE R0,(VJ3_D)
+		
+IZADI	STORE R0,(VJ3_END)
+		POP R0
+		MOVE R0,SR
+		POP R0
+		RETI
+
+OBRADI	PUSH R1
+		MOVE 1,R0
+		LOAD R1,(SP+8)
+		SHL R0,R1,R0
+		POP R1
+		RET	
+
+GOTOVO	DW 1
